@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Condition monitor</title>
+<style>
+:root{font:16px system-ui,sans-serif;color:#dce3ec;background:#101722;color-scheme:dark}body{max-width:1100px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;gap:16px;align-items:center}h1{font-size:1.6rem}h2{font-size:1.15rem}a{color:#9ccaff}small,.muted{color:#a7b6c9}#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.card,article{background:#192332;padding:18px;border:1px solid #34445a;border-radius:6px;margin:12px 0}.card{border-top:4px solid #61c995}.WARN{border-top-color:#efbd58}.ALARM{border-top-color:#ff7d7d}.value{font-size:2rem;font-variant-numeric:tabular-nums}.state{float:right;font-weight:bold}svg{width:100%;height:70px;color:#9ccaff}p{overflow-wrap:anywhere;white-space:pre-wrap}#status{min-height:1.5em}li{margin:8px 0}button{padding:8px}footer{margin-top:32px;color:#a7b6c9}
+</style>
+<header><h1 id="label">Condition monitor</h1><a id="setup" href="setup">Setup</a></header>
+<p id="status" role="status">Loading measurements…</p><main><div id="cards"></div>
+<h2>Active alarms and warnings</h2><ul id="alarms"></ul>
+<h2>Maintenance notifications</h2><div id="notifications"></div></main>
+<footer>Limits and linear trends depend on the configured machine. Review cited manual guidance before acting.</footer>
+<script>
+let pages=false, snapshot=null, fetchedAt=0;
+const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
+function sparkline(history){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 280 70');svg.setAttribute('role','img');svg.setAttribute('aria-label','Recent value history');
+  const values=history.map(p=>p[1]);if(!values.length)return svg;
+  const low=Math.min(...values),range=Math.max(...values)-low||1;
+  const line=document.createElementNS(svg.namespaceURI,'polyline');line.setAttribute('points',values.map((v,i)=>`${i*280/Math.max(1,values.length-1)},${65-(v-low)*60/range}`).join(' '));line.setAttribute('fill','none');line.setAttribute('stroke','currentColor');line.setAttribute('stroke-width','2');svg.append(line);return svg;
+}
+function render(data){
+  document.getElementById('label').textContent=data.label;
+  const age=Math.max(0,Math.floor((Date.now()-Date.parse(data.generated))/60000));
+  document.getElementById('status').textContent=`${data.source.toUpperCase()} · updated ${age} min ago${pages?' · GitHub snapshot':' · local live view'}`;
+  document.getElementById('setup').hidden=pages;
+  const cards=document.getElementById('cards'),alarms=document.getElementById('alarms'),notes=document.getElementById('notifications');cards.replaceChildren();alarms.replaceChildren();notes.replaceChildren();
+  for(const t of data.tags){
+    const card=el('section',undefined,`card ${t.state==='ALARM'?'ALARM':t.state==='WARN'?'WARN':'OK'}`);
+    card.append(el('span',t.state,'state'),el('h2',`${t.asset} / ${t.name}`),el('div',t.value===null?'Waiting for data':`${Number(t.value).toPrecision(5)} ${t.unit}`,'value'),sparkline(t.history||[]));
+    card.append(el('small',t.ts?`Sample: ${new Date(t.ts).toLocaleString()}`:'No sample yet'));
+    if(t.time_to_limit_s!==null)card.append(el('p',`Linear trend to alarm: ${Number(t.time_to_limit_s).toFixed(1)} s`));
+    card.append(el('p',Object.entries(t.limits).map(([k,v])=>`${k}: ${v}`).join(' · '),'muted'));cards.append(card);
+    if(t.state!=='OK')alarms.append(el('li',`${t.asset} / ${t.name}: ${t.state} (${t.value} ${t.unit})`));
+  }
+  if(!alarms.children.length)alarms.append(el('li','No active alarms or warnings.'));
+  for(const n of data.notifications||[]){const article=el('article');article.append(el('h2',`Priority ${n.Priority} · ${n.ShortText}`),el('small',new Date(n.ts).toLocaleString()),el('p',n.LongText),el('p',`Sources: ${(n.Sources||[]).join('; ')}`,'muted'));notes.append(article)}
+  if(!notes.children.length)notes.append(el('p','No notifications recorded.'));
+}
+async function update(){
+  try{
+    if(!pages){
+      const response=await fetch('api/state',{cache:'no-store'});
+      try{if(!response.ok)throw Error();snapshot=await response.json()}catch{pages=true}
+    }
+    if(pages && (!snapshot || Date.now()-fetchedAt>=60000)){const response=await fetch('snapshot.json',{cache:'no-store'});if(!response.ok)throw Error('Snapshot unavailable');snapshot=await response.json();fetchedAt=Date.now()}
+    render(snapshot);
+  }catch{document.getElementById('status').textContent='Could not refresh measurements. Displayed values may be stale.'}
+  setTimeout(update,pages?60000:2000);
+}
+update();
+</script></html>
