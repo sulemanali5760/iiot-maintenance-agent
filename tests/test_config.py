@@ -32,5 +32,5 @@ def test_validation(data, message):
 def test_sim_defaults_and_public_example():
     assert len(from_dict({"source": {"type": "sim"}}).tags) == 3
     cfg = load("examples/public-demo.toml")
-    assert len(cfg.tags) == 2
+    assert len(cfg.tags) == 3
     assert cfg.github.branch == "gh-pages"
