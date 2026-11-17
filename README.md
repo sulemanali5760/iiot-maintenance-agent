@@ -44,6 +44,11 @@ The old `bridge`, `store` and `watch` commands are replaced by `run`.
 
 ## GitHub dashboard
 
+[Live example](https://sulemanali5760.github.io/iiot-maintenance-agent/): a scheduled GitHub Action connects every hour
+to the public umati OPC UA server (`opc.tcp://opcua.umati.app:4843`), reads three values of its sample
+robot for 60 seconds and pushes the snapshot (`.github/workflows/live.yml`, `examples/public-demo.toml`).
+The robot is a sample device whose values the server simulates; the connection and the pipeline are real.
+
 Create a fine-grained GitHub token with **Contents: read and write on one repository**. Set it in
 the environment variable `IIOT_AGENT_GITHUB_TOKEN`, then edit:
 

@@ -1,8 +1,7 @@
 name: live
 on:
-  # schedule enabled once the public server is verified
-  # schedule:
-    # - cron: "*/30 * * * *"
+  schedule:
+    - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
       browse:
