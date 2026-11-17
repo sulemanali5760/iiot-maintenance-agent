@@ -5,15 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "iiot-maintenance-agent"
 version = "0.1.0"
-description = "A simulated shop-floor to maintenance notification chain."
+description = "Shop floor to maintenance: simulated IO-Link sensors over OPC UA and MQTT into SQLite, trend detection, and a maintenance notification with cited manual sources."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Suleman Ali" }]
+keywords = ["iiot", "opc-ua", "mqtt", "condition-monitoring", "maintenance", "industrial-automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
 dependencies = ["asyncua>=1.1,<3", "paho-mqtt>=2,<3"]
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
+
+[project.urls]
+Repository = "https://github.com/sulemanali5760/iiot-maintenance-agent"
 
 [project.scripts]
 iiot-agent = "iiot_agent.cli:main"

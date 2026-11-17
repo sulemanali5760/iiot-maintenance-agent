@@ -1,6 +1,6 @@
 # iiot-maintenance-agent
 
-[![ci](https://github.com/sulemanali5760/iiot-maintenance-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/sulemanali5760/iiot-maintenance-agent/actions/workflows/ci.yml)
+[![ci](https://github.com/sulemanali5760/iiot-maintenance-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/sulemanali5760/iiot-maintenance-agent/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/iiot-maintenance-agent)](https://pypi.org/project/iiot-maintenance-agent/)
 
 A small Python demonstration of the shop-floor-to-maintenance chain: simulated pump sensors,
 OPC UA, MQTT, SQLite, fixed limits and a linear trend, followed by a maintenance notification
@@ -21,12 +21,14 @@ flowchart LR
 
 ## Install and run offline
 
-Python 3.11 or newer. From this checkout:
+Python 3.11 or newer.
 
-```powershell
-python -m pip install -e .
+```bash
+pip install iiot-maintenance-agent
 iiot-agent demo
 ```
+
+Without internet: download the offline bundle for your system from the [latest release](https://github.com/sulemanali5760/iiot-maintenance-agent/releases/latest), unzip it and run `python -m pip install --no-index --find-links . iiot-maintenance-agent` inside the folder.
 
 The demo uses `values_at`, an in-memory bus and SQLite with no broker, server, sleep or API key.
 It prints the first WARN and ALARM per sensor, SQL measurements, a time-to-alarm-limit estimate,
