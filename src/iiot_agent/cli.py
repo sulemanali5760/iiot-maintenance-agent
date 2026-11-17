@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import bridge, notify, sim
 from .agent import AnthropicLLM, build_notification
-from .bus import InMemoryBus, MqttBus
+from .bus import InMemoryBus
 from .detect import LIMITS, evaluate, time_to_limit
 from .model import Alarm, Reading
 from .retrieve import Retriever
@@ -62,78 +62,130 @@ def _demo(args) -> None:
         store.close()
 
 
-def _consume(args) -> None:
-    # Process callbacks on the main thread so SQLite, reporting and ERP failures propagate.
-    import queue
+def _browse(args):
+    from opcua_tagmap.browse import browse
+    from .config import SourceCfg
+    from .sources import security
 
-    messages = queue.Queue()
-    bus = MqttBus(args.mqtt_host, args.mqtt_port, args.client_id,
-                  args.tls_ca, args.tls_cert, args.tls_key)
-    store, retriever, seen = Store(args.db), Retriever(), set()
-    bus.subscribe(f"plant/{args.line}/+/+", lambda topic, payload: messages.put(payload))
+    src = SourceCfg(endpoint=args.endpoint, security_policy=args.security_policy,
+                    security_mode=args.security_mode, cert_dir=args.cert_dir, username=args.user or "")
+    result = asyncio.run(browse(args.endpoint, root=args.root, security=security(src)))
+    for tag in result.tags:
+        print(f"{tag.browse_path}\t{tag.node_id}\t{tag.datatype}")
+    if result.errors:
+        print(f"Browse: {len(result.errors)} node(s) could not be read")
+    if result.truncated:
+        print("Browse truncated at the node limit")
+
+
+def _monitor(args):
+    import threading
+    import time
+    from .config import load
+    from .engine import Engine
+    from .web import create_server
+
     try:
-        while True:
-            payload = messages.get()
-            try:
-                reading = Reading(**payload)
-                if reading.sensor not in LIMITS:
-                    raise ValueError("Unknown sensor")
-                store.insert(reading)
-            except (TypeError, ValueError) as error:
-                print(f"Rejected reading: {error}")
-                continue
-            if args.command == "watch":
-                _notification(reading, store, seen, retriever, args)
+        cfg = load(args.config)
+    except ValueError as error:
+        # Schema errors contain no credential values or raw protocol responses.
+        raise SystemExit(f"error: {error}") from None
+    if args.command == "snapshot":
+        # A one-shot job pushes exactly once, after its collection window.
+        cfg.github.enabled = False
+    engine = Engine(cfg)
+    server = thread = None
+    try:
+        if args.command == "run" and not args.no_web:
+            server = create_server(engine, args.config)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            print(f"Dashboard: http://{cfg.web.host}:{server.server_port}")
+        engine.start()
+        if args.command == "snapshot":
+            time.sleep(args.duration)
+            if not engine.readings:
+                raise SystemExit(1)
+            if args.push:
+                engine.push()
+        else:
+            while True:
+                time.sleep(0.5)
     finally:
-        bus.close()
-        store.close()
+        if server:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+        engine.stop()
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Simulated IIoT maintenance chain")
+    parser = argparse.ArgumentParser(description="Condition monitoring with zero infrastructure")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("demo", "sim", "bridge", "store", "watch"):
+    for name in ("demo", "sim"):
         sub = commands.add_parser(name)
         if name in ("demo", "sim"):
             sub.add_argument("--seed", type=int, default=7)
             sub.add_argument("--fault-start", type=int, default=40)
-        if name in ("sim", "bridge"):
+        if name == "sim":
             sub.add_argument("--endpoint", default=sim.ENDPOINT)
         if name == "sim":
             sub.add_argument("--period", type=float, default=1.0)
         if name == "demo":
             sub.add_argument("--steps", type=int, default=160)
-        if name in ("demo", "store", "watch"):
+        if name == "demo":
             sub.add_argument("--db", default=":memory:" if name == "demo" else "readings.db")
-        if name in ("demo", "watch"):
+        if name == "demo":
             sub.add_argument("--erp-url")
             sub.add_argument("--llm", action="store_true")
-        if name in ("bridge", "store", "watch"):
-            sub.add_argument("--mqtt-host", default="localhost")
-            sub.add_argument("--mqtt-port", type=int)
-            sub.add_argument("--client-id", default="")
-            sub.add_argument("--tls-ca")
-            sub.add_argument("--tls-cert")
-            sub.add_argument("--tls-key")
-            sub.add_argument("--line", default="line1")
+    sub = commands.add_parser("init")
+    sub.add_argument("-o", "--output", default="iiot-agent.toml")
+    sub = commands.add_parser("browse")
+    sub.add_argument("endpoint")
+    sub.add_argument("--root")
+    sub.add_argument("--security-policy", default="None")
+    sub.add_argument("--security-mode", default="SignAndEncrypt")
+    sub.add_argument("--cert-dir", default="pki")
+    sub.add_argument("--user")
+    for name in ("run", "snapshot"):
+        sub = commands.add_parser(name)
+        sub.add_argument("-c", "--config", default="iiot-agent.toml")
+        if name == "run":
+            sub.add_argument("--no-web", action="store_true")
+        else:
+            sub.add_argument("--duration", type=float, default=60)
+            sub.add_argument("--push", action="store_true")
     args = parser.parse_args(argv)
     if getattr(args, "llm", False) and not os.environ.get("ANTHROPIC_API_KEY"):
         parser.error("--llm requires ANTHROPIC_API_KEY")
     try:
+        import logging
+        logging.basicConfig(level=logging.WARNING)
+        # Third-party protocol debug output can contain user identity information.
+        logging.getLogger("asyncua").setLevel(logging.CRITICAL)
+        if args.command == "snapshot":
+            import math
+            if not math.isfinite(args.duration) or args.duration <= 0:
+                parser.error("--duration must be positive")
         if args.command == "demo":
             if args.steps <= 0:
                 parser.error("--steps must be positive")
             _demo(args)
         elif args.command == "sim":
             asyncio.run(sim.serve(args.endpoint, args.period, args.seed, args.fault_start))
-        elif args.command == "bridge":
-            bus = MqttBus(args.mqtt_host, args.mqtt_port, args.client_id,
-                          args.tls_ca, args.tls_cert, args.tls_key)
-            try:
-                asyncio.run(bridge.run(bus, args.endpoint, args.line))
-            finally:
-                bus.close()
+        elif args.command == "init":
+            from pathlib import Path
+            from .config import example
+            with Path(args.output).open("x", encoding="utf-8") as stream:
+                stream.write(example())
+            print(f"Created {args.output}")
+        elif args.command == "browse":
+            _browse(args)
         else:
-            _consume(args)
+            _monitor(args)
     except KeyboardInterrupt:
         pass
+    except (OSError, ValueError):
+        parser.exit(1, "error: invalid configuration, file or connection; check settings and credentials\n")
+    except Exception:
+        parser.exit(1, "error: operation failed; check server availability, security and credentials\n")

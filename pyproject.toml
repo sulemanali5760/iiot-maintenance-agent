@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iiot-maintenance-agent"
-version = "0.1.0"
-description = "Shop floor to maintenance: simulated IO-Link sensors over OPC UA and MQTT into SQLite, trend detection, and a maintenance notification with cited manual sources."
+version = "0.2.0"
+description = "Condition monitoring with zero infrastructure: OPC UA or MQTT, a local dashboard and optional GitHub Pages snapshots."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -17,7 +17,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
 ]
-dependencies = ["asyncua>=1.1,<3", "paho-mqtt>=2,<3"]
+dependencies = ["asyncua>=1.1,<3", "paho-mqtt>=2,<3", "opcua-tagmap>=0.3,<1"]
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
@@ -32,7 +32,7 @@ iiot-agent = "iiot_agent.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-iiot_agent = ["manual/*.md"]
+iiot_agent = ["manual/*.md", "static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

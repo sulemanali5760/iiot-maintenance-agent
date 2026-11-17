@@ -3,7 +3,7 @@ import threading
 from collections.abc import Callable
 from typing import Protocol
 
-Callback = Callable[[str, dict], None]
+Callback = Callable[[str, object], None]
 
 
 class Publisher(Protocol):
@@ -85,7 +85,7 @@ class MqttBus:
     def _on_message(self, client, userdata, message) -> None:
         try:
             payload = json.loads(message.payload)
-            if not isinstance(payload, dict):
+            if not isinstance(payload, (dict, int, float)):
                 return
         except (ValueError, UnicodeDecodeError):
             return

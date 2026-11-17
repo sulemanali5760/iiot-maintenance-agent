@@ -1,7 +1,8 @@
 import math
+import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .model import Reading
 
@@ -16,6 +17,9 @@ class Store:
                 ts TEXT, asset TEXT, sensor TEXT, value REAL, unit TEXT, status INTEGER
             );
             CREATE INDEX IF NOT EXISTS readings_sensor_ts ON readings(asset, sensor, ts);
+            CREATE TABLE IF NOT EXISTS notifications (
+                ts TEXT, asset TEXT, tag TEXT, priority INTEGER, json TEXT
+            );
         """)
 
     def insert(self, reading: Reading) -> None:
@@ -53,6 +57,41 @@ class Store:
                 (SELECT value FROM readings WHERE asset=? AND sensor=?
                  ORDER BY ts DESC, rowid DESC LIMIT ?)""", (asset, sensor, n)).fetchone()
         return dict(row)
+
+    def add_notification(self, ts: str, asset: str, tag: str, notification: dict) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT INTO notifications VALUES (?, ?, ?, ?, ?)",
+                             (ts, asset, tag, notification["Priority"],
+                              json.dumps(notification, allow_nan=False)))
+
+    def notifications(self, n: int = 50) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT ts, json FROM notifications ORDER BY ts DESC, rowid DESC LIMIT ?",
+                                    (n,)).fetchall()
+        return [dict(json.loads(row["json"]), ts=row["ts"]) for row in rows]
+
+    def history(self, asset: str, tag: str, since: str, max_points: int = 300) -> list:
+        if max_points <= 0:
+            raise ValueError("max_points must be positive")
+        start = datetime.fromisoformat(since).timestamp()
+        with self._lock:
+            end = self._db.execute("SELECT MAX(julianday(ts)) FROM readings WHERE asset=? AND sensor=?",
+                                   (asset, tag)).fetchone()[0]
+            if end is None:
+                return []
+            end = (end - 2440587.5) * 86400
+            width = max(0.001, (end - start + 0.001) / max_points)
+            rows = self._db.execute("""SELECT MIN(ts) AS ts, AVG(value) AS value FROM readings
+                WHERE asset=? AND sensor=? AND julianday(ts)>=julianday(?)
+                GROUP BY CAST(((julianday(ts)-2440587.5)*86400-?)/? AS INTEGER)
+                ORDER BY ts LIMIT ?""", (asset, tag, since, start, width, max_points)).fetchall()
+        return [[row["ts"], row["value"]] for row in rows]
+
+    def prune(self, keep_days: int) -> None:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).isoformat()
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM readings WHERE ts<?", (cutoff,))
+            self._db.execute("DELETE FROM notifications WHERE ts<?", (cutoff,))
 
     def close(self) -> None:
         with self._lock:

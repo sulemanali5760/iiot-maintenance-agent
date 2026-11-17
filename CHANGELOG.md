@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Configurable OPC UA subscriptions, MQTT numeric/JSON input and reconnect backoff.
+- TOML configuration, tag browsing and a local dashboard with setup, history and alarms.
+- Per-tag high/low limits, notification re-arming, SQLite retention and SQL downsampling.
+- Optional GitHub Pages snapshots, bounded merged history and a scheduled public-demo workflow.
+- Retained offline demo and OPC UA simulator; run supersedes bridge/store/watch commands.
+
 ## 0.1.0
 
 - Simulated three-port IO-Link master exposed over OPC UA.

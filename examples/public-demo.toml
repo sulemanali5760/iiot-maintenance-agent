@@ -1,0 +1,41 @@
+# Public Eclipse Milo demo. Availability and NodeIds can change.
+# NodeIds MUST be checked with: iiot-agent browse opc.tcp://milo.digitalpetri.com:62541/milo
+# Candidate NodeIds have not been verified here; use the live workflow's browse input.
+[source]
+type = "opcua"
+endpoint = "opc.tcp://milo.digitalpetri.com:62541/milo"
+security_policy = "None"
+sampling_ms = 1000
+
+[[tags]]
+name = "random_double"
+asset = "Milo"
+node = "ns=2;s=Dynamic/RandomDouble"
+unit = ""
+warn = 0.5
+alarm = 0.8
+low_warn = -0.5
+low_alarm = -0.8
+
+[[tags]]
+name = "random_int32"
+asset = "Milo"
+node = "ns=2;s=Dynamic/RandomInt32"
+unit = ""
+warn = 1000000000
+alarm = 1800000000
+low_warn = -1000000000
+low_alarm = -1800000000
+
+[store]
+path = "iiot-agent.db"
+keep_days = 7
+
+[github]
+enabled = true
+repo = "sulemanali5760/iiot-maintenance-agent"
+branch = "gh-pages"
+every_minutes = 15
+history_days = 7
+token_env = "IIOT_AGENT_GITHUB_TOKEN"
+label = "Public OPC UA demo server (Eclipse Milo)"

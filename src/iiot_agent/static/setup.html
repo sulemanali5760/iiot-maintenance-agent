@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor setup</title>
+<style>
+:root{font:16px system-ui,sans-serif;color:#dce3ec;background:#101722;color-scheme:dark}body{max-width:1200px;margin:auto;padding:24px}a{color:#9ccaff}h1{font-size:1.6rem}fieldset{border:1px solid #34445a;margin:20px 0;padding:16px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}label{display:block}input,select,button{font:inherit;padding:9px;border:1px solid #526781;border-radius:4px;background:#192332;color:inherit}label input,label select{display:block;width:100%;box-sizing:border-box;margin-top:6px}button{cursor:pointer;margin:12px 12px 12px 0;background:#294563}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:8px;border-bottom:1px solid #34445a}td input{width:100px}td input[type=checkbox]{width:auto}td .wide{width:180px}small{color:#a7b6c9}#status{white-space:pre-wrap;min-height:2em}summary{cursor:pointer}
+</style>
+<a href="/">Dashboard</a><h1>Monitor setup</h1>
+<p>Choose the source and select tags. Save updates the TOML file and restarts collection. Passwords are used only for Browse; collection reads OPCUA_PASSWORD from the process environment.</p>
+<form id="form"><fieldset><legend>Data source</legend><div class="fields">
+<label>Source<select id="type"><option value="opcua">OPC UA</option><option value="mqtt">MQTT</option><option value="sim">Simulation</option></select></label>
+<label>OPC UA endpoint<input id="endpoint"></label>
+<label>Security policy<select id="security_policy"><option>None</option><option>Basic256Sha256</option><option>Aes128_Sha256_RsaOaep</option><option>Aes256_Sha256_RsaPss</option></select></label>
+<label>Security mode<select id="security_mode"><option>SignAndEncrypt</option><option>Sign</option></select></label>
+<label>Certificate directory<input id="cert_dir"></label><label>Server certificate<input id="server_cert"></label>
+<label>Username<input id="username" autocomplete="off"></label><label>Browse password<input id="password" type="password" autocomplete="off"></label>
+<label>Sampling interval (ms)<input id="sampling_ms" type="number" min="1"></label>
+<label>MQTT host<input id="host"></label><label>MQTT port<input id="port" type="number" min="1" max="65535"></label>
+<label>MQTT client ID<input id="client_id"></label><label>MQTT TLS CA<input id="tls_ca"></label><label>MQTT TLS certificate<input id="tls_cert"></label><label>MQTT TLS key<input id="tls_key"></label>
+</div><button type="button" id="browse">Browse OPC UA</button></fieldset>
+<p id="status" role="status"></p><h2>Tags</h2><small>Check tags to collect. Leave limits blank to disable them. MQTT accepts numbers or a numeric JSON field.</small>
+<div class="scroll"><table><thead><tr><th>Use</th><th>Path / type</th><th>Name</th><th>Asset</th><th>NodeId</th><th>Topic</th><th>JSON key</th><th>Unit</th><th>Warn</th><th>Alarm</th><th>Low warn</th><th>Low alarm</th></tr></thead><tbody id="tags"></tbody></table></div>
+<button type="button" id="add">Add tag</button><button type="submit">Save configuration</button></form>
+<script>
+let config;
+const sourceFields=['type','endpoint','security_policy','security_mode','cert_dir','server_cert','username','sampling_ms','host','port','client_id','tls_ca','tls_cert','tls_key'];
+const tagFields=['name','asset','node','topic','json_key','unit','warn','alarm','low_warn','low_alarm'];
+const limits=['warn','alarm','low_warn','low_alarm'];
+function row(tag={},description='',selected=true){
+  const tr=document.createElement('tr'),check=document.createElement('input');check.type='checkbox';check.checked=selected;
+  const td=document.createElement('td');td.append(check);tr.append(td);
+  const desc=document.createElement('td');desc.textContent=description;tr.append(desc);
+  for(const key of tagFields){const td=document.createElement('td'),input=document.createElement('input');input.dataset.key=key;input.setAttribute('aria-label',key);input.value=tag[key]??(key==='asset'?'P101':key==='json_key'?'value':'');if(limits.includes(key)){input.type='number';input.step='any'}if(['node','topic'].includes(key))input.className='wide';td.append(input);tr.append(td)}
+  document.getElementById('tags').append(tr);
+}
+function selectedTags(){return [...document.querySelectorAll('#tags tr')].filter(tr=>tr.querySelector('input[type=checkbox]').checked).map(tr=>{const t={};for(const input of tr.querySelectorAll('[data-key]')){const k=input.dataset.key;if(limits.includes(k)){if(input.value!=='')t[k]=Number(input.value)}else t[k]=input.value}return t})}
+function source(){const result={...config.source};for(const key of sourceFields)result[key]=['sampling_ms','port'].includes(key)?Number(document.getElementById(key).value):document.getElementById(key).value;return result}
+async function post(path,data){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw Error(result.error||'Request failed');return result}
+const status=document.getElementById('status');
+document.getElementById('browse').onclick=async()=>{
+  status.textContent='Browsing…';
+  try{const result=await post('/api/browse',{...source(),password:document.getElementById('password').value});
+    const current=selectedTags();document.getElementById('tags').replaceChildren();
+    const found=new Set();for(const t of result.tags){const existing=current.find(x=>x.node===t.node_id);row(existing||{name:t.display_name,node:t.node_id},`${t.browse_path} (${t.datatype})`,Boolean(existing));found.add(t.node_id)}
+    for(const tag of current)if(!found.has(tag.node))row(tag,'Configured tag');
+    status.textContent=`${result.tags.length} variables.${result.truncated?' Browse truncated.':''} ${(result.errors||[]).join('; ')}`;
+  }catch(error){status.textContent=error.message}finally{document.getElementById('password').value=''}
+};
+document.getElementById('add').onclick=()=>row();
+document.getElementById('form').onsubmit=async event=>{event.preventDefault();try{const next={...config,source:source(),tags:selectedTags()};await post('/api/config',next);config=next;status.textContent='Saved. Collection restarted. Web host/port changes take effect after restarting the command.'}catch(error){status.textContent=error.message}};
+async function load(){try{const response=await fetch('/api/config');if(!response.ok)throw Error('Could not load configuration');config=await response.json();for(const key of sourceFields)document.getElementById(key).value=config.source[key];for(const tag of config.tags)row(tag,'Configured tag')}catch(error){status.textContent=error.message;document.querySelectorAll('button').forEach(b=>b.disabled=true)}}
+load();
+</script></html>

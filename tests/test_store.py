@@ -1,8 +1,28 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 
 from iiot_agent.bus import InMemoryBus
 from iiot_agent.model import Reading
 from iiot_agent.store import Store
+
+
+def test_history_downsampling_and_retention():
+    store = Store()
+    now = datetime.now(timezone.utc)
+    try:
+        for i in range(100):
+            store.insert(Reading("P101", "x", i, "", (now - timedelta(seconds=100-i)).isoformat()))
+        history = store.history("P101", "x", (now - timedelta(seconds=100)).isoformat(), 5)
+        assert len(history) == 5
+        assert history[0][1] < history[-1][1]
+        old = (now - timedelta(days=40)).isoformat()
+        store.insert(Reading("P101", "old", 1, "", old))
+        store.add_notification(old, "P101", "old", {"Priority": 1})
+        store.prune(30)
+        assert store.latest("P101", "old", 1) == []
+        assert store.notifications() == []
+    finally:
+        store.close()
 
 
 def test_sql_queries():

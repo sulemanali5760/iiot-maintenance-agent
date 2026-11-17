@@ -7,7 +7,18 @@ LIMITS = {
 }
 
 
-def evaluate(values: list[float], sensor: str = "vibration") -> str:
+def evaluate(values, sensor="vibration") -> str:
+    from .config import TagCfg
+
+    if isinstance(sensor, TagCfg):
+        value, tag = values, sensor
+        if ((tag.alarm is not None and value >= tag.alarm) or
+                (tag.low_alarm is not None and value <= tag.low_alarm)):
+            return "ALARM"
+        if ((tag.warn is not None and value >= tag.warn) or
+                (tag.low_warn is not None and value <= tag.low_warn)):
+            return "WARN"
+        return "OK"
     if not values:
         return "OK"
     limits = LIMITS[sensor]

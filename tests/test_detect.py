@@ -1,6 +1,15 @@
 import pytest
 
 from iiot_agent.detect import evaluate, time_to_limit
+from iiot_agent.config import TagCfg
+
+
+def test_configured_high_and_low_limits():
+    tag = TagCfg("custom", warn=8, alarm=10, low_warn=3, low_alarm=1)
+    for value, state in [(0, "ALARM"), (1, "ALARM"), (2, "WARN"), (3, "WARN"),
+                         (5, "OK"), (8, "WARN"), (10, "ALARM")]:
+        assert evaluate(value, tag) == state
+    assert evaluate(100, TagCfg("no-limits")) == "OK"
 
 
 def test_limits():
