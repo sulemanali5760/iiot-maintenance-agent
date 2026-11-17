@@ -36,7 +36,18 @@ timestamps make offline runs repeatable. Use `--db demo.db` to persist readings.
 The default run is 160 one-second steps; the bearing-wear fault starts at step 40, vibration reaches
 WARN (4.5 mm/s) around step 94 and ALARM (7.1 mm/s) around step 146.
 
-DEMO_OUTPUT_PLACEHOLDER
+Output of `iiot-agent demo`, copied from the CI run (Ubuntu, Python 3.12):
+
+```text
+$ iiot-agent demo
+Alarm: vibration WARN 4.517 mm/s; time to alarm limit: 51.0 s
+Notification: {"NotificationType": "M2", "Equipment": "P101", "FunctionalLocation": "PLANT-LINE1-P101", "Priority": 2, "ShortText": "vibration WARN: P101", "LongText": "vibration: 4.517 mm/s at 2026-01-01T00:01:34+00:00; state WARN. Last 20 readings SQL stats: {'count': 20, 'min': 3.5417296392857964, 'max': 4.516607958826345, 'avg': 4.0283152512585865}. Linear trend time to alarm limit: 51.0 seconds.\nRecommended steps: [Vibration and bearing wear] Rising vibration can indicate bearing wear; inspect the bearing before continued operation. [Bearing temperature] Rising bearing temperature can indicate insufficient lubrication or bearing damage. [Bearing replacement and lock-out/tag-out] Stop the pump and apply the site's lock-out/tag-out procedure before bearing replacement.", "Sources": ["Vibration and bearing wear", "Bearing temperature", "Bearing replacement and lock-out/tag-out"]}
+Alarm: vibration ALARM 7.103 mm/s; time to alarm limit: 0.0 s
+Notification: {"NotificationType": "M2", "Equipment": "P101", "FunctionalLocation": "PLANT-LINE1-P101", "Priority": 1, "ShortText": "vibration ALARM: P101", "LongText": "vibration: 7.103 mm/s at 2026-01-01T00:02:26+00:00; state ALARM. Last 20 readings SQL stats: {'count': 20, 'min': 6.164864103877276, 'max': 7.1033043888026475, 'avg': 6.62394869821197}. Linear trend time to alarm limit: 0.0 seconds.\nRecommended steps: [Vibration and bearing wear] Rising vibration can indicate bearing wear; inspect the bearing before continued operation. [Bearing temperature] Rising bearing temperature can indicate insufficient lubrication or bearing damage. [Bearing replacement and lock-out/tag-out] Stop the pump and apply the site's lock-out/tag-out procedure before bearing replacement.", "Sources": ["Vibration and bearing wear", "Bearing temperature", "Bearing replacement and lock-out/tag-out"]}
+Readings stored: 480
+```
+
+At WARN the linear trend estimates 51 s until the alarm limit; the alarm follows 52 steps (seconds) later.
 
 ## Running against a real broker
 
