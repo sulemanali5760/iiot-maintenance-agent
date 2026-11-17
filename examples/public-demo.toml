@@ -1,31 +1,36 @@
-# Public Eclipse Milo demo. Availability and NodeIds can change.
-# NodeIds MUST be checked with: iiot-agent browse opc.tcp://milo.digitalpetri.com:62541/milo
-# Candidate NodeIds have not been verified here; use the live workflow's browse input.
+# Public umati sample server (VDMA umati showcase, opc.tcp://opcua.umati.app:4843).
+# The robot below is a sample device on that server; its values are simulated by the server.
+# NodeIds checked with a browse from GitHub Actions on 17 Nov 2026; check again with:
+#   iiot-agent browse opc.tcp://opcua.umati.app:4843
 [source]
 type = "opcua"
-endpoint = "opc.tcp://milo.digitalpetri.com:62541/milo"
+endpoint = "opc.tcp://opcua.umati.app:4843"
 security_policy = "None"
 sampling_ms = 1000
 
 [[tags]]
-name = "random_double"
-asset = "Milo"
-node = "ns=2;s=Dynamic/RandomDouble"
-unit = ""
-warn = 0.5
-alarm = 0.8
-low_warn = -0.5
-low_alarm = -0.8
+name = "axis1_speed"
+asset = "umati-robot"
+node = "ns=32;i=6024"
+unit = "deg/s"
+warn = 17.0
+alarm = 19.0
 
 [[tags]]
-name = "random_int32"
-asset = "Milo"
-node = "ns=2;s=Dynamic/RandomInt32"
-unit = ""
-warn = 1000000000
-alarm = 1800000000
-low_warn = -1000000000
-low_alarm = -1800000000
+name = "axis2_speed"
+asset = "umati-robot"
+node = "ns=32;i=6033"
+unit = "deg/s"
+warn = 17.0
+alarm = 19.0
+
+[[tags]]
+name = "motor1_temperature"
+asset = "umati-robot"
+node = "ns=32;i=6054"
+unit = "degC"
+warn = 17.0
+alarm = 19.0
 
 [store]
 path = "iiot-agent.db"
@@ -38,4 +43,4 @@ branch = "gh-pages"
 every_minutes = 15
 history_days = 7
 token_env = "IIOT_AGENT_GITHUB_TOKEN"
-label = "Public OPC UA demo server (Eclipse Milo)"
+label = "umati sample robot (public OPC UA server, simulated values)"

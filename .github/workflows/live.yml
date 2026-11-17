@@ -23,7 +23,7 @@ jobs:
       - run: pip install .
       - name: Browse public server
         if: inputs.browse == true
-        run: iiot-agent browse opc.tcp://milo.digitalpetri.com:62541/milo
+        run: iiot-agent browse opc.tcp://opcua.umati.app:4843
       - name: Collect and push snapshot to gh-pages
         if: inputs.browse != true
         run: iiot-agent snapshot -c examples/public-demo.toml --duration 60 --push
